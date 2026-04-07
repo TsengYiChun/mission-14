@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>專案預算與任務管控中心</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Auth -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+        <div class="login-card glass-panel">
+            <div class="logo-container">
+                <i class="fa-solid fa-chart-pie logo-icon"></i>
+            </div>
+            <h1 class="logo-text">專案預算中心</h1>
+            <p class="login-subtitle">跨層級計畫、任務與預算智能管控</p>
+            <button id="authorize_button" class="btn btn-google">
+                <i class="fa-brands fa-google"></i>
+                <span>使用 Google 帳戶登入</span>
+            </button>
+        </div>
+        
+        <!-- 背景裝飾元 -->
+        <div class="bg-orb orb-1"></div>
+        <div class="bg-orb orb-2"></div>
+    </div>
+
+    <!-- Main Dashboard Screen -->
+    <div id="app-screen" class="screen">
+        <nav class="sidebar glass-panel-dark">
+            <div class="sidebar-header">
+                <i class="fa-solid fa-chart-pie color-primary"></i> 
+                <span>專案管控</span>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-target="dashboard-view">
+                    <i class="fa-solid fa-border-all"></i> 總覽儀表板
+                </li>
+                <li class="nav-item" data-target="plans-view">
+                    <i class="fa-solid fa-folder-tree"></i> 計畫管理
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <button id="signout_button" class="btn btn-outline btn-full">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> 登出
+                </button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <header class="topbar">
+                <h2 id="view-title" class="page-title">總覽儀表板</h2>
+                <div class="user-profile">
+                    <div class="status-dot"></div>
+                    <span>已連線至 Google Sheets</span>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <!-- Dashboard View -->
+                <div id="dashboard-view" class="view-section active">
+                    <!-- Stats summary -->
+                    <div class="stats-grid">
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon-wrapper i-blue"><i class="fa-solid fa-folder"></i></div>
+                            <div class="stat-data">
+                                <h3>計畫總數</h3>
+                                <div class="stat-val" id="stat-total-plans">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon-wrapper i-purple"><i class="fa-solid fa-list-check"></i></div>
+                            <div class="stat-data">
+                                <h3>任務總數</h3>
+                                <div class="stat-val" id="stat-total-tasks">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon-wrapper i-green"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+                            <div class="stat-data">
+                                <h3>全計畫總預算</h3>
+                                <div class="stat-val" id="stat-total-budget">$0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Area -->
+                    <div class="charts-grid">
+                        <div class="chart-container glass-panel">
+                            <h3 class="chart-title">各計畫總預算分布</h3>
+                            <div class="chart-wrapper">
+                                <canvas id="dashboardPlanBudgetChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-container glass-panel">
+                            <h3 class="chart-title">計畫進度總覽</h3>
+                            <div class="chart-wrapper">
+                                <canvas id="dashboardProgressChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Plans/Tasks/Jobs Management View -->
+                <div id="plans-view" class="view-section">
+                    <div class="toolbar glass-panel">
+                        <div class="breadcrumbs" id="dynamic-breadcrumbs">
+                            <span class="crumb active" onclick="ui.navigateToLevel('plans')">計畫列表</span>
+                        </div>
+                        <div class="toolbar-actions">
+                            <button class="btn btn-primary" id="btn-add-item">
+                                <i class="fa-solid fa-plus"></i> 新增計畫
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Context Overview Card (For showing Plan/Task details when drilling down) -->
+                    <div id="context-overview" class="context-card glass-panel hidden">
+                        <!-- Filled dynamically -->
+                    </div>
+
+                    <!-- Data List -->
+                    <div class="data-grid-container glass-panel">
+                        <div id="data-list" class="data-list">
+                            <!-- Loading indicator -->
+                            <div class="loading-spinner">
+                                <i class="fa-solid fa-circle-notch fa-spin"></i> 載入中...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Plan Modal -->
+    <div id="modal-plan" class="modal-overlay">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 id="modal-plan-title">新增計畫</h3>
+                <button class="btn-close" onclick="ui.closeModal('plan')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-plan">
+                    <input type="hidden" id="plan-id">
+                    <div class="form-group">
+                        <label for="plan-name">計畫名稱 *</label>
+                        <input type="text" id="plan-name" class="form-control" required placeholder="請輸入計畫名稱">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="plan-initial-budget">初始預算 *</label>
+                            <input type="number" id="plan-initial-budget" class="form-control" min="0" required placeholder="0">
+                        </div>
+                        <div class="form-group half">
+                            <label for="plan-add-budget">追加預算</label>
+                            <input type="number" id="plan-add-budget" class="form-control" min="0" value="0">
+                            <small class="help-text">計畫總運算 = 初始預算 + 追加預算</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="ui.closeModal('plan')">取消</button>
+                <button class="btn btn-primary" onclick="ui.savePlan()">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div id="modal-task" class="modal-overlay">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 id="modal-task-title">新增任務</h3>
+                <button class="btn-close" onclick="ui.closeModal('task')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-4">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <div>
+                        <div id="task-budget-rule-40">單一任務預算不可超過計畫總預算的 40%</div>
+                        <div id="task-budget-rule-150">任務總預算累計不可超過計畫總預算的 150%</div>
+                    </div>
+                </div>
+                <form id="form-task">
+                    <input type="hidden" id="task-id">
+                    <input type="hidden" id="task-plan-id">
+                    <div class="form-group">
+                        <label for="task-name">任務名稱 *</label>
+                        <input type="text" id="task-name" class="form-control" required placeholder="請輸入任務名稱">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="task-budget">任務預算 *</label>
+                            <input type="number" id="task-budget" class="form-control" min="0" required placeholder="0">
+                            <small id="task-budget-hint" class="help-text">上限: $0</small>
+                        </div>
+                        <div class="form-group half">
+                            <label for="task-actual-cost">實際花費金額</label>
+                            <input type="number" id="task-actual-cost" class="form-control" min="0" value="0">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="ui.closeModal('task')">取消</button>
+                <button class="btn btn-primary" onclick="ui.saveTask()">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Modal -->
+    <div id="modal-job" class="modal-overlay">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 id="modal-job-title">新增工作</h3>
+                <button class="btn-close" onclick="ui.closeModal('job')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-job">
+                    <input type="hidden" id="job-id">
+                    <input type="hidden" id="job-task-id">
+                    <div class="form-group">
+                        <label for="job-name">工作名稱 *</label>
+                        <input type="text" id="job-name" class="form-control" required placeholder="請輸入工作項目名稱">
+                    </div>
+                    <div class="form-group">
+                        <label for="job-allocated-amount">配置金額 *</label>
+                        <input type="number" id="job-allocated-amount" class="form-control" min="0" required placeholder="0">
+                        <small id="job-allocated-hint" class="help-text">剩餘可配置金額: $0</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="job-is-completed">
+                            <span class="checkmark"></span>
+                            標記為已完成
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="ui.closeModal('job')">取消</button>
+                <button class="btn btn-primary" onclick="ui.saveJob()">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Toast Alert -->
+    <div id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/business.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
